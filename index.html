@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>Cubo en three.js</title>
+		<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+     
+        
+	</head>
+	<body >
+		<div id="canvas" align="center"></div>
+
+        <script src="./js/jquery3_3_1.min.js"></script>
+		<script src="./js/three.js"></script>
+		<script src="./js/WebGL.js"></script>
+		<script src="./js/GLTFLoader.js"></script>
+		<!-- <script src="./js/dat.gui.min.js"></script> -->
+		<script src="./js/OrbitControls.js"></script>
+		<script src="./js/animacion_cuy/tween.min.js"></script>
+		<script src="./js/animacion_cuy/TweenMax.min.js"></script>
+		<!-- archivo que contendrá la parte lógica -->
+		<script>
+			
+      
+      // Configuración de la escena
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(
+        75,
+        window.innerWidth / window.innerHeight,
+        0.1,
+        1000
+      );
+      const renderer = new THREE.WebGLRenderer();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      document.body.appendChild(renderer.domElement);
+
+      let model; // Variable global para el modelo
+
+      // Luz ambiental
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.5); // Color y fuerza
+      scene.add(ambientLight);
+
+      // Carga del modelo GLB
+      const loader = new THREE.GLTFLoader();
+      loader.load('images/cuy6.glb', function (gltf) {
+        model = gltf.scene;
+        model.rotation.y = Math.PI / 2; // Rotación inicial opcional
+        scene.add(model);
+      });
+
+      // Posición de la cámara
+      camera.position.z = 5;
+
+      // Animación de rotación
+      function animate() {
+        requestAnimationFrame(animate);
+        if (model) {
+          model.rotation.y += 0.01;
+        }
+        renderer.render(scene, camera);
+      }
+
+      // Llamada a la animación
+      animate();
+		</script>
+	</body>
+</html>

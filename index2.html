@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8" />
+		<title>Three.js Example</title>
+		<style>
+			body {
+				margin: 0;
+				overflow: hidden;
+			}
+		</style>
+	</head>
+	<body style="width: 100%; height: 100vh">
+		<button id="camaraBTN">iniciar camara</button>
+		<!-- <button id="animar">animar</button> -->
+		<!-- <div id="container" style="width: 100%;height: 100vh;"></div> -->
+		<!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+		<script src="https://cdn.rawgit.com/mrdoob/three.js/r128/examples/js/loaders/GLTFLoader.js"></script>
+		<script src="https://cdn.rawgit.com/mrdoob/three.js/r128/examples/js/controls/OrbitControls.js"></script> -->
+		<script src="./js/jquery3_3_1.min.js"></script>
+		<script src="./js/three.js"></script>
+		<script src="./js/WebGL.js"></script>
+		<script src="./js/GLTFLoader.js"></script>
+
+		<!-- <script src="./js/dat.gui.min.js"></script> -->
+		<script src="./js/OrbitControls.js"></script>
+
+		<!-- <script src="./js/animacion_cuy/Funciones_Easing.js"></script> -->
+		<!-- <script src="./js/animacion_cuy/animacion.js"></script> -->
+		<!-- <script src="./js/animacion_cuy/animacion_cuy.js"></script> -->
+		<!-- <script src="./js/animacion_cuy/animacion_cuy_teclas.js"></script> -->
+		<script src="./js/animacion_cuy/tween.min.js"></script>
+		<script src="./js/animacion_cuy/TweenMax.min.js"></script>
+		<!-- <script src="./js/animacion_cuy/ClaseWebSocketsCuy.js"></script> -->
+
+		<script>
+			$(document).ready(function () {
+				var ANIMACION_CUY = false
+				const btnAnimar = $('#camaraBTN')
+				initRender()
+
+				btnAnimar.on('click', function () {
+					testAnimacion()
+				})
+			})
+
+			const initRender = () => {
+				// $("#container").append('<p>hola</p>');
+				iniciarClocks()
+			}
+
+			const iniciarClocks = () => {
+				console.log('se inicio')
+				var width = window.innerWidth
+				var height = window.innerHeight
+
+				// Crear la cámara
+				camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000)
+				camera.position.set(0, 10, 0)
+
+				// Crear la escena
+				scene = new THREE.Scene()
+				scene.background = new THREE.Color(0xa0a0a0)
+				scene.fog = new THREE.Fog(0xa0a0a0, 10, 50)
+
+				// Crear el renderizador
+				renderer = new THREE.WebGLRenderer({ antialias: true })
+				renderer.setPixelRatio(window.devicePixelRatio)
+				renderer.setSize(width, height)
+				renderer.gammaOutput = true
+				renderer.gammaFactor = 2.2
+				renderer.shadowMap.enabled = true
+				document.body.appendChild(renderer.domElement)
+
+				var hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444)
+				hemiLight.position.set(0, 20, 0)
+				scene.add(hemiLight)
+
+				var dirLight = new THREE.DirectionalLight(0xffffff)
+				dirLight.position.set(-3, 20, -15)
+				dirLight.castShadow = true
+				dirLight.shadow.camera.top = 2
+				dirLight.shadow.camera.bottom = -2
+				dirLight.shadow.camera.left = -2
+				dirLight.shadow.camera.right = 2
+				dirLight.shadow.camera.near = 0.1
+				dirLight.shadow.camera.far = 40
+				dirLight.shadow.mapSize.height = 2048
+				dirLight.shadow.mapSize.height = 2048
+				scene.add(dirLight)
+
+				//cambia la posicion de la camara
+				camera.lookAt(new THREE.Vector3(0, 0, 0))
+
+				//agrega piso
+				var mesh = new THREE.Mesh(
+					new THREE.PlaneBufferGeometry(100, 100),
+					new THREE.MeshPhongMaterial({
+						color: 0x999999,
+						depthWrite: false,
+					})
+				)
+				mesh.rotation.x = -Math.PI / 2
+				mesh.receiveShadow = true
+				scene.add(mesh)
+				CAJAS_ARRAY = []
+
+				//agregar glb
+				const loaderCaja = new THREE.GLTFLoader()
+
+				TIEMPO_RENDER = performance.now()
+
+				// Cargar el archivo GLTF
+				loaderCaja.load('images/glb/cajaclaros.glb', function (gltfCaja) {
+					todo = gltfCaja
+					modelCaja = gltfCaja.scenes[0]
+					modelCaja.traverse(function (object) {
+						if (object instanceof THREE.Mesh) {
+							object.castShadow = true
+						}
+					})
+					// modelCaja.scale.set(0.005, 0.005, 0.005);
+					modelCaja.children[0].children[0].position.y = 0.28
+					modelCaja.children[0].children[0].children[1].scale.set(
+						2.4,
+						2.4,
+						4.21
+					) /// suelo
+
+					modelCaja.name = 'TABLA_CAJAS'
+					scene.add(modelCaja)
+					// skeleton = new THREE.SkeletonHelper(modelCaja);
+					//cargar_archivos(); ///////////////////////
+					// modelCaja.children[0].children[0].rotation.y = 180 * (Math.PI / 180); ////rotar cajas para que caja X verde este arriba
+
+					modelCaja.children[0].children[0].children[1].receiveShadow = true
+					// modelCaja.children[0].position.y = 39;
+					// modelCaja.children[0].children[1].scale.set(3, 3, 3); ///suelo
+					// CAJAS_ARRAY = modelCaja.children[0].children[0].children;  /// 0 1 => MADERAS   2=>caja verde  ,  3=> 32, 4 => 15 ...
+					CAJAS_ARRAY = modelCaja.children[0].children[0].children[0].children
+					cajax = modelCaja.children[0].children[0].children[2]
+				})
+				var mixer
+
+
+				
+				// Renderizar la escena
+				function render() {
+					requestAnimationFrame(render);
+  
+					// Actualiza la mezcladora en cada fotograma
+					//controls.update()
+					renderer.render(scene, camera)
+				}
+				render()
+			}
+
+		
+
+			const animacion1 = () => {
+				cargar_archivos()
+			}
+			const animar_camara = () => {
+				detener_var_animarcamara()
+				ANIMACION_CUY = true
+				console.log('la camara empieza a moverse')
+				TWEEN.update()
+				var_animarcamara = requestAnimationFrame(animar_camara)
+				renderer.render(scene, camera)
+				if (typeof controls != 'undefined') {
+					controls.update()
+				}
+			}
+
+			function detener_var_animarcamara() {
+				console.log('animacion de la cajita gei')
+				TWEEN.removeAll()
+				if (typeof var_animarcamara != 'undefined') {
+					cancelAnimationFrame(var_animarcamara)
+					delete var_animarcamara
+				}
+			}
+
+			function camara_mirar(objeto) {
+				camera.position.x = objeto.position.x
+				camera.position.y = objeto.position.y + 1.6
+				camera.position.z = objeto.position.z + 4.5
+				camera.lookAt(objeto.position)
+				console.log('aniamcion de camara???')
+			}
+			function cargar_archivos() {
+				var index = 0
+				var archivos = [
+					'images/cuy6.glb',
+					'images/cajaPensando.glb',
+					'images/cuyDudandoGLB.glb',
+					// 'images/cuyChoqueGLB.glb'
+					'images/glb/cuyChoque2.glb',
+					// ,'images/glb/cuyesperando.glb'
+					// ,'images/glb/cuypremio.glb'
+					// ,'images/glb/cuysalto.glb'
+					// ,'images/glb/tablero.glb'
+				]
+				dt = 0.03 // velocidad movimiento cuy
+				dtrotacion = 0.05 // velocidad rotacion cuy;
+				escalacuys = 0.25
+				escalacajagirando = 0.04
+				intervalo_consultaevento = 2000
+				buscando_evento = false
+
+				var objLoader = new THREE.GLTFLoader()
+				objLoader.load(archivos[index], function (gltf) {
+					if (archivos[index] == 'images/cuy6.glb') {
+						model = gltf.scenes[0]
+						model.traverse(function (object) {
+							if (object instanceof THREE.Mesh) {
+								object.castShadow = true
+							}
+						})
+						model.scale.set(escalacuys, escalacuys, escalacuys)
+						model.position.set(0, 0, 0)
+						model.name = 'CUY'
+
+						model.castShadow = true
+						model.receiveShadow = true
+						scene.add(model)
+						skeleton = new THREE.SkeletonHelper(model)
+						var animations = gltf.animations
+						mixer = new THREE.AnimationMixer(model)
+						mixer.clipAction(animations[0]).play()
+					}
+					if (archivos[index] == 'images/cajaPensando.glb') {
+						modelCajaP = gltf.scenes[0]
+						modelCajaP.traverse(function (objectCajaGira) {
+							if (objectCajaGira instanceof THREE.Mesh) {
+								objectCajaGira.castShadow = true
+							}
+						})
+						modelCajaP.name = 'CAJA_GIRANDO'
+						modelCajaP.scale.set(
+							escalacajagirando,
+							escalacajagirando,
+							escalacajagirando
+						)
+						modelCajaP.position.set(0, 0, 0)
+						modelCajaP.castShadow = true
+						modelCajaP.receiveShadow = true
+
+						scene.add(modelCajaP)
+						var animations = gltf.animations
+
+						mixerCajaP = new THREE.AnimationMixer(modelCajaP)
+						mixerCajaP.clipAction(animations[0]).play()
+					}
+					if (archivos[index] == 'images/cuyDudandoGLB.glb') {
+						modelCuyDudando = gltf.scenes[0]
+						modelCuyDudando.castShadow = true
+						modelCuyDudando.receiveShadow = true
+						modelCuyDudando.traverse(function (objectCuyDudando) {
+							if (objectCuyDudando instanceof THREE.Mesh) {
+								objectCuyDudando.castShadow = true
+							}
+						})
+						modelCuyDudando.name = 'CUY_DUDANDO'
+
+						modelCuyDudando.scale.set(escalacuys, escalacuys, escalacuys)
+						modelCuyDudando.position.set(0, 0, 0)
+						scene.add(modelCuyDudando)
+						var animations = gltf.animations
+						mixerCuyDudando = new THREE.AnimationMixer(modelCuyDudando)
+						mixerCuyDudando.clipAction(animations[0]).play()
+					}
+					if (
+						archivos[index] == 'images/glb/cuyChoque2.glb'
+						// "images/cuyChoqueGLB.glb"
+					) {
+						modelCuyChoque = gltf.scenes[0]
+						modelCuyChoque.traverse(function (objectCuyChoque) {
+							if (objectCuyChoque instanceof THREE.Mesh) {
+								objectCuyChoque.castShadow = true
+							}
+						})
+						modelCuyChoque.castShadow = true
+						modelCuyChoque.receiveShadow = true
+						modelCuyChoque.name = 'CUY_CHOQUE'
+						modelCuyChoque.scale.set(escalacuys, escalacuys, escalacuys)
+						modelCuyChoque.position.set(0, 0, 0)
+						// modelCuyChoque.children[0].children[0].scale.set(1,1,1);
+						scene.add(modelCuyChoque)
+						var animations = gltf.animations
+						mixerCuyChoque = new THREE.AnimationMixer(modelCuyChoque)
+						mixerCuyChoque.clipAction(animations[0]).play()
+					}
+
+					if (archivos[index] == 'images/glb/cuypremio.glb') {
+						modelCuyPremio = gltf.scenes[0]
+						modelCuyPremio.traverse(function (objeto) {
+							if (objeto instanceof THREE.Mesh) {
+								objeto.castShadow = true
+							}
+						})
+						modelCuyPremio.castShadow = true
+						modelCuyPremio.receiveShadow = true
+						modelCuyPremio.name = 'CUY_PREMIO'
+						modelCuyPremio.scale.set(escalacuys, escalacuys, escalacuys)
+						modelCuyPremio.position.set(0, 0, 0)
+						scene.add(modelCuyPremio)
+						var animations = gltf.animations
+						mixerCuyPremio = new THREE.AnimationMixer(modelCuyPremio)
+						mixerCuyPremio.clipAction(animations[0]).play()
+					}
+
+					if (archivos[index] == 'images/glb/cuyesperando.glb') {
+						modelCuyEsperando = gltf.scenes[0]
+						modelCuyEsperando.traverse(function (objeto) {
+							if (objeto instanceof THREE.Mesh) {
+								objeto.castShadow = true
+							}
+						})
+						modelCuyEsperando.castShadow = true
+						modelCuyEsperando.receiveShadow = true
+						modelCuyEsperando.name = 'CUY_PREMIO'
+						modelCuyEsperando.scale.set(escalacuys, escalacuys, escalacuys)
+						modelCuyEsperando.position.set(0, 0, 0)
+						scene.add(modelCuyEsperando)
+						var animations = gltf.animations
+						mixerCuyEsperando = new THREE.AnimationMixer(modelCuyEsperando)
+						mixerCuyEsperando.clipAction(animations[0]).play()
+					}
+					if (archivos[index] == 'images/glb/cuysalto.glb') {
+						modelCuySalto = gltf.scenes[0]
+						modelCuySalto.traverse(function (objeto) {
+							if (objeto instanceof THREE.Mesh) {
+								objeto.castShadow = true
+							}
+						})
+						modelCuySalto.castShadow = true
+						modelCuySalto.receiveShadow = true
+						modelCuySalto.name = 'CUY_PREMIO'
+						modelCuySalto.scale.set(escalacuys, escalacuys, escalacuys)
+						modelCuySalto.position.set(0, 0, 0)
+						scene.add(modelCuySalto)
+						var animations = gltf.animations
+						mixerCuySalto = new THREE.AnimationMixer(modelCuySalto)
+						mixerCuySalto.clipAction(animations[0]).play()
+					}
+
+					index++
+					cargar_archivos()
+				})
+			}
+		</script>
+
+		<!-- <script>
+			var index = 0
+			var archivos = [
+				'images/cuy6.glb',
+				'images/cajaPensando.glb',
+				'images/cuyDudandoGLB.glb',
+				// 'images/cuyChoqueGLB.glb'
+				'images/glb/cuyChoque2.glb',
+				// ,'images/glb/cuyesperando.glb'
+				// ,'images/glb/cuypremio.glb'
+				// ,'images/glb/cuysalto.glb'
+				// ,'images/glb/tablero.glb'
+			]
+			dt = 0.03 // velocidad movimiento cuy
+			dtrotacion = 0.05 // velocidad rotacion cuy;
+			escalacuys = 0.25
+			escalacajagirando = 0.04
+			intervalo_consultaevento = 2000
+			buscando_evento = false
+
+			ANIMACION_CUY = false
+			GANADOR_DE_EVENTO = ''
+			EVENTO_ID = ''
+			ARRAY_PUNTOSCAJAS = []
+
+			ARRAY_PUNTOSCAJAS.push({
+				nombre: 26,
+				posicion: { x: -0.30980586278363836, y: 0, z: -3.3762877429185947 },
+			})
+			ARRAY_PUNTOSCAJAS.push({
+				nombre: 3,
+				posicion: { x: -0.949006568309034, y: 0, z: -3.356998701580594 },
+			})
+			ARRAY_PUNTOSCAJAS.push({
+				nombre: 35,
+				posicion: { x: -1.4167106765152129, y: 0, z: -3.1356755102510894 },
+			})
+			ARRAY_PUNTOSCAJAS.push({
+				nombre: 12,
+				posicion: { x: -1.8540938062507262, y: 0, z: -2.791641244935619 },
+			})
+			///29 28
+			ARRAY_PUNTOSCAJAS.push({
+				nombre: 28,
+				posicion: { x: -2.3978601268406794, y: 0, z: -2.467785601362559 },
+			})
+			ARRAY_PUNTOSCAJAS.push({
+				nombre: 7,
+				posicion: { x: -2.765080554750653, y: 0, z: -2.0221378996133974 },
+			})
+			ARRAY_PUNTOSCAJAS.push({
+				nombre: 29,
+				posicion: { x: -2.9853090380374905, y: 0, z: -1.541500347580593 },
+			})
+			ARRAY_PUNTOSCAJAS.push({
+				nombre: 18,
+				posicion: { x: -3.224733808882785, y: 0, z: -0.9138055339476931 },
+			})
+			ARRAY_PUNTOSCAJAS.push({
+				nombre: 22,
+				posicion: { x: -3.4912757475952065, y: 0, z: -0.44938379926419136 },
+			})
+			ARRAY_PUNTOSCAJAS.push({
+				nombre: 9,
+				posicion: { x: -3.476497, y: 0, z: 0.23360957 },
+			})
+			ARRAY_PUNTOSCAJAS.push({
+				nombre: 31,
+				posicion: { x: -3.35743326, y: 0, z: 0.7374220786 },
+			})
+			ARRAY_PUNTOSCAJAS.push({
+				nombre: 14,
+				posicion: { x: -3.28769929, y: 0, z: 1.28942981 },
+			})
+			ARRAY_PUNTOSCAJAS.push({
+				nombre: 20,
+				posicion: { x: -2.8653985, y: 0, z: 1.736809 },
+			})
+			ARRAY_PUNTOSCAJAS.push({
+				nombre: 1,
+				posicion: { x: -2.51463235, y: 0, z: 2.18843981 },
+			})
+			ARRAY_PUNTOSCAJAS.push({
+				nombre: 33,
+				posicion: { x: -2.1874753, y: 0, z: 2.60356937 },
+			})
+			ARRAY_PUNTOSCAJAS.push({
+				nombre: 16,
+				posicion: { x: -1.593648, y: 0, z: 2.85932161 },
+			})
+			///24´
+			ARRAY_PUNTOSCAJAS.push({
+				nombre: 24,
+				posicion: { x: -1.088638265020644, y: 0, z: 3.2145740703933443 },
+			})
+			ARRAY_PUNTOSCAJAS.push({
+				nombre: 5,
+				posicion: { x: -0.5348062371620586, y: 0, z: 3.301620951663683 },
+			})
+			ARRAY_PUNTOSCAJAS.push({
+				nombre: 10,
+				posicion: { x: -0.02302394273425558, y: 0, z: 3.5234013240937334 },
+			})
+			ARRAY_PUNTOSCAJAS.push({
+				nombre: 23,
+				posicion: { x: 0.5254609302769983, y: 0, z: 3.3041370243871855 },
+			})
+			ARRAY_PUNTOSCAJAS.push({
+				nombre: 8,
+				posicion: { x: 1.1413224681962724, y: 0, z: 3.2268432103527904 },
+			})
+			ARRAY_PUNTOSCAJAS.push({
+				nombre: 30,
+				posicion: { x: 1.6125922448708456, y: 0, z: 2.9984823398983607 },
+			})
+			ARRAY_PUNTOSCAJAS.push({
+				nombre: 11,
+				posicion: { x: 2.164808512786406, y: 0, z: 2.7421715169359664 },
+			})
+			ARRAY_PUNTOSCAJAS.push({
+				nombre: 36,
+				posicion: { x: 2.651818597146128, y: 0, z: 2.3733912998766367 },
+			})
+			ARRAY_PUNTOSCAJAS.push({
+				nombre: 13,
+				posicion: { x: 2.9243464869306433, y: 0, z: 1.831102276556383 },
+			})
+			ARRAY_PUNTOSCAJAS.push({
+				nombre: 27,
+				posicion: { x: 3.0508343404937066, y: 0, z: 1.2188483240919867 },
+			})
+			ARRAY_PUNTOSCAJAS.push({
+				nombre: 6,
+				posicion: { x: 3.32875742450882, y: 0, z: 0.7543380207997183 },
+			})
+			ARRAY_PUNTOSCAJAS.push({
+				nombre: 34,
+				posicion: { x: 3.377377358498914, y: 0, z: 0.12394453640106479 },
+			})
+			ARRAY_PUNTOSCAJAS.push({
+				nombre: 17,
+				posicion: { x: 3.4183559221406865, y: 0, z: -0.36684366594296364 },
+			})
+			ARRAY_PUNTOSCAJAS.push({
+				nombre: 25,
+				posicion: { x: 3.263097590331593, y: 0, z: -0.9840921494909135 },
+			})
+
+			ARRAY_PUNTOSCAJAS.push({
+				nombre: 2,
+				posicion: { x: 3.037643184345156, y: 0, z: -1.5227852729244755 },
+			})
+			ARRAY_PUNTOSCAJAS.push({
+				nombre: 21,
+				posicion: { x: 2.7196177221423063, y: 0, z: -1.959217585937729 },
+			})
+			ARRAY_PUNTOSCAJAS.push({
+				nombre: 4,
+				posicion: { x: 2.3607702253224208, y: 0, z: -2.3638512662486857 },
+			})
+			ARRAY_PUNTOSCAJAS.push({
+				nombre: 19,
+				posicion: { x: 2.002183195861022, y: 0, z: -2.910166458303999 },
+			})
+			ARRAY_PUNTOSCAJAS.push({
+				nombre: 15,
+				posicion: { x: 1.448259415771182, y: 0, z: -3.172386117998001 },
+			})
+			ARRAY_PUNTOSCAJAS.push({
+				nombre: 32,
+				posicion: { x: 0.931038104276527, y: 0, z: -3.348998139977028 },
+			})
+
+			ARRAY_PUNTOSCAJAS.push({
+				nombre: 0,
+				posicion: { x: 0.21479664977962323, y: 0, z: -2.8940485718326103 },
+			})
+
+			clock = new THREE.Clock()
+			clockCuyDudando = new THREE.Clock()
+			clockCajaP = new THREE.Clock()
+			clockCuyChoque = new THREE.Clock()
+			clockCuyPremio = new THREE.Clock()
+			clockCuyEsperando = new THREE.Clock()
+			clockCuySalto = new THREE.Clock()
+			var container = document.getElementById('container')
+			camera = new THREE.PerspectiveCamera(
+				60,
+				window.innerWidth / window.innerHeight,
+				1,
+				100
+			)
+			camera.position.set(0, 10, 0)
+			scene = new THREE.Scene()
+			scene.background = new THREE.Color(0xa0a0a0)
+			scene.fog = new THREE.Fog(0xa0a0a0, 10, 50)
+			var hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444)
+			hemiLight.position.set(0, 20, 0)
+			scene.add(hemiLight)
+			var dirLight = new THREE.DirectionalLight(0xffffff)
+			dirLight.position.set(-3, 20, -15)
+			dirLight.castShadow = true
+			dirLight.shadow.camera.top = 2
+			dirLight.shadow.camera.bottom = -2
+			dirLight.shadow.camera.left = -2
+			dirLight.shadow.camera.right = 2
+			dirLight.shadow.camera.near = 0.1
+			dirLight.shadow.camera.far = 40
+
+			dirLight.shadow.mapSize.height = 2048
+			dirLight.shadow.mapSize.height = 2048
+			scene.add(dirLight)
+			// var axesHelper = new THREE.AxesHelper( 5,5,5 );
+			// scene.add( axesHelper );
+			// controls = new THREE.OrbitControls(camera);
+			// controls.autoRotateSpeed = 10;
+			camera.lookAt(new THREE.Vector3(0, 0, 0))
+
+			var mesh = new THREE.Mesh(
+				new THREE.PlaneBufferGeometry(100, 100),
+				new THREE.MeshPhongMaterial({
+					color: 0x999999,
+					depthWrite: false,
+				})
+			)
+			mesh.rotation.x = -Math.PI / 2
+			mesh.receiveShadow = true
+			scene.add(mesh)
+			//var material = new THREE.MeshBasicMaterial();
+			var loader = new THREE.GLTFLoader()
+			// Plano y Cajas
+			CAJAS_ARRAY = []
+			var loaderCaja = new THREE.GLTFLoader()
+			loaderCaja.load('images/glb/cajaclaros.glb', function (gltfCaja) {
+				todo = gltfCaja
+				modelCaja = gltfCaja.scenes[0]
+				modelCaja.traverse(function (object) {
+					if (object instanceof THREE.Mesh) {
+						object.castShadow = true
+					}
+				})
+				// modelCaja.scale.set(0.005, 0.005, 0.005);
+				modelCaja.children[0].children[0].position.y = 0.28
+				modelCaja.children[0].children[0].children[1].scale.set(2.4, 2.4, 4.21) /// suelo
+
+				modelCaja.name = 'TABLA_CAJAS'
+				scene.add(modelCaja)
+				// skeleton = new THREE.SkeletonHelper(modelCaja);
+				cargar_archivos() ///////////////////////
+				// modelCaja.children[0].children[0].rotation.y = 180 * (Math.PI / 180); ////rotar cajas para que caja X verde este arriba
+
+				modelCaja.children[0].children[0].children[1].receiveShadow = true
+				// modelCaja.children[0].position.y = 39;
+				// modelCaja.children[0].children[1].scale.set(3, 3, 3); ///suelo
+				// CAJAS_ARRAY = modelCaja.children[0].children[0].children;  /// 0 1 => MADERAS   2=>caja verde  ,  3=> 32, 4 => 15 ...
+				CAJAS_ARRAY = modelCaja.children[0].children[0].children[0].children
+				cajax = modelCaja.children[0].children[0].children[2]
+			})
+
+			renderer = new THREE.WebGLRenderer({ antialias: true })
+			renderer.setPixelRatio(window.devicePixelRatio)
+			renderer.setSize(window.innerWidth, window.innerHeight)
+			renderer.gammaFactor = 2.2
+			renderer.shadowMap.enabled = true
+			container.appendChild(renderer.domElement)
+
+			function cargar_archivos() {
+				var objLoader = new THREE.GLTFLoader()
+				if (index > archivos.length - 1) {
+					otro = model.clone() ////////////////////////
+					TIEMPO_RENDER = performance.now()
+					TIEMPO_FIN_RENDER = performance.now() - TIEMPO_RENDER
+					TIEMPO_FIN_RENDER = (TIEMPO_FIN_RENDER / 1000).toFixed(2)
+					console.warn('FIN CARGA ARCHIVOS en ' + TIEMPO_FIN_RENDER + ' seg')
+					//CargarEstadistica(1);
+
+					///NUEVOOOOOOOOOO
+					//iniciar_websocketservidor();
+
+					window.addEventListener('resize', responsive_canvas, false)
+					return
+				}
+
+				objLoader.load(archivos[index], function (gltf) {
+					if (archivos[index] == 'images/cuy6.glb') {
+						model = gltf.scenes[0]
+						model.traverse(function (object) {
+							if (object instanceof THREE.Mesh) {
+								object.castShadow = true
+							}
+						})
+						model.scale.set(escalacuys, escalacuys, escalacuys)
+						model.position.set(0, 0, 0)
+						model.name = 'CUY'
+
+						model.castShadow = true
+						model.receiveShadow = true
+						scene.add(model)
+						skeleton = new THREE.SkeletonHelper(model)
+						var animations = gltf.animations
+						mixer = new THREE.AnimationMixer(model)
+						mixer.clipAction(animations[0]).play()
+					}
+					if (archivos[index] == 'images/cajaPensando.glb') {
+						modelCajaP = gltf.scenes[0]
+						modelCajaP.traverse(function (objectCajaGira) {
+							if (objectCajaGira instanceof THREE.Mesh) {
+								objectCajaGira.castShadow = true
+							}
+						})
+						modelCajaP.name = 'CAJA_GIRANDO'
+						modelCajaP.scale.set(
+							escalacajagirando,
+							escalacajagirando,
+							escalacajagirando
+						)
+						modelCajaP.position.set(0, 0, 0)
+						modelCajaP.castShadow = true
+						modelCajaP.receiveShadow = true
+
+						scene.add(modelCajaP)
+						var animations = gltf.animations
+
+						mixerCajaP = new THREE.AnimationMixer(modelCajaP)
+						mixerCajaP.clipAction(animations[0]).play()
+					}
+					if (archivos[index] == 'images/cuyDudandoGLB.glb') {
+						modelCuyDudando = gltf.scenes[0]
+						modelCuyDudando.castShadow = true
+						modelCuyDudando.receiveShadow = true
+						modelCuyDudando.traverse(function (objectCuyDudando) {
+							if (objectCuyDudando instanceof THREE.Mesh) {
+								objectCuyDudando.castShadow = true
+							}
+						})
+						modelCuyDudando.name = 'CUY_DUDANDO'
+
+						modelCuyDudando.scale.set(escalacuys, escalacuys, escalacuys)
+						modelCuyDudando.position.set(0, 0, 0)
+						scene.add(modelCuyDudando)
+						var animations = gltf.animations
+						mixerCuyDudando = new THREE.AnimationMixer(modelCuyDudando)
+						mixerCuyDudando.clipAction(animations[0]).play()
+					}
+					if (
+						archivos[index] == 'images/glb/cuyChoque2.glb'
+						// "images/cuyChoqueGLB.glb"
+					) {
+						modelCuyChoque = gltf.scenes[0]
+						modelCuyChoque.traverse(function (objectCuyChoque) {
+							if (objectCuyChoque instanceof THREE.Mesh) {
+								objectCuyChoque.castShadow = true
+							}
+						})
+						modelCuyChoque.castShadow = true
+						modelCuyChoque.receiveShadow = true
+						modelCuyChoque.name = 'CUY_CHOQUE'
+						modelCuyChoque.scale.set(escalacuys, escalacuys, escalacuys)
+						modelCuyChoque.position.set(0, 0, 0)
+						// modelCuyChoque.children[0].children[0].scale.set(1,1,1);
+						scene.add(modelCuyChoque)
+						var animations = gltf.animations
+						mixerCuyChoque = new THREE.AnimationMixer(modelCuyChoque)
+						mixerCuyChoque.clipAction(animations[0]).play()
+					}
+
+					if (archivos[index] == 'images/glb/cuypremio.glb') {
+						modelCuyPremio = gltf.scenes[0]
+						modelCuyPremio.traverse(function (objeto) {
+							if (objeto instanceof THREE.Mesh) {
+								objeto.castShadow = true
+							}
+						})
+						modelCuyPremio.castShadow = true
+						modelCuyPremio.receiveShadow = true
+						modelCuyPremio.name = 'CUY_PREMIO'
+						modelCuyPremio.scale.set(escalacuys, escalacuys, escalacuys)
+						modelCuyPremio.position.set(0, 0, 0)
+						scene.add(modelCuyPremio)
+						var animations = gltf.animations
+						mixerCuyPremio = new THREE.AnimationMixer(modelCuyPremio)
+						mixerCuyPremio.clipAction(animations[0]).play()
+					}
+
+					if (archivos[index] == 'images/glb/cuyesperando.glb') {
+						modelCuyEsperando = gltf.scenes[0]
+						modelCuyEsperando.traverse(function (objeto) {
+							if (objeto instanceof THREE.Mesh) {
+								objeto.castShadow = true
+							}
+						})
+						modelCuyEsperando.castShadow = true
+						modelCuyEsperando.receiveShadow = true
+						modelCuyEsperando.name = 'CUY_PREMIO'
+						modelCuyEsperando.scale.set(escalacuys, escalacuys, escalacuys)
+						modelCuyEsperando.position.set(0, 0, 0)
+						scene.add(modelCuyEsperando)
+						var animations = gltf.animations
+						mixerCuyEsperando = new THREE.AnimationMixer(modelCuyEsperando)
+						mixerCuyEsperando.clipAction(animations[0]).play()
+					}
+					if (archivos[index] == 'images/glb/cuysalto.glb') {
+						modelCuySalto = gltf.scenes[0]
+						modelCuySalto.traverse(function (objeto) {
+							if (objeto instanceof THREE.Mesh) {
+								objeto.castShadow = true
+							}
+						})
+						modelCuySalto.castShadow = true
+						modelCuySalto.receiveShadow = true
+						modelCuySalto.name = 'CUY_PREMIO'
+						modelCuySalto.scale.set(escalacuys, escalacuys, escalacuys)
+						modelCuySalto.position.set(0, 0, 0)
+						scene.add(modelCuySalto)
+						var animations = gltf.animations
+						mixerCuySalto = new THREE.AnimationMixer(modelCuySalto)
+						mixerCuySalto.clipAction(animations[0]).play()
+					}
+					// if (archivos[index] =="images/glb/tablero.glb") {
+					//     modelCuyTablero = gltf.scenes[0];
+					//     modelCuyTablero.traverse(function (objeto) {
+					//         if (objeto instanceof THREE.Mesh) {
+					//             objeto.castShadow = true
+					//         }
+					//     });
+					//     modelCuyTablero.castShadow=true;
+					//     modelCuyTablero.receiveShadow=true;
+					//     modelCuyTablero.name = "CUY_PREMIO";
+					//     modelCuyTablero.scale.set(escalacuys, escalacuys, escalacuys);
+					//     modelCuyTablero.position.set(0, 0, 0);
+					//     scene.add(modelCuyTablero);
+					//     var animations = gltf.animations;
+					//     mixerCuySalto = new THREE.AnimationMixer(modelCuyTablero);
+					//     mixerCuySalto.clipAction(animations[0]).play();
+					// }
+					index++
+					cargar_archivos()
+				})
+			}
+			function responsive_canvas() {
+				camera.aspect = window.innerWidth / window.innerHeight
+				camera.updateProjectionMatrix()
+				renderer.setSize(window.innerWidth, window.innerHeight)
+			}
+		</script> -->
+	</body>
+</html>
